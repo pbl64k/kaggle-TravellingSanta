@@ -54,13 +54,6 @@ quad make_quad(vertex_id a, vertex_id b, vertex_id c, vertex_id n)
 	return static_cast<quad>(a) | (static_cast<quad>(b) << 18) | (static_cast<quad>(c) << 36) | (static_cast<quad>(n) << 54);
 }
 
-/*
-bool f(const int &x)
-{
-	return true;
-}
-*/
-
 class path
 {
 	public:
@@ -76,6 +69,10 @@ class path
 
 	path(const path &orig): dist_(orig.dist_), cur_(orig.cur_),
 			p_(orig.p_), vs_(orig.vs_), es_(orig.es_)
+	{
+	}
+
+	~path()
 	{
 	}
 
@@ -281,8 +278,10 @@ void opt_path(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &
 	pth.vs_[cur] = ins->prev_;
 
 	/*
+	// SANITY
 	dq_node<vertex_id> *a = pth.p_.first_;
 	dq_node<vertex_id> *b = pth.p_.first_->next_;
+
 	for (int kkk = 0; kkk != PROB_SZ - 1; ++kkk)
 	{
 		if (blacklist.find(make_edge(a->d_, b->d_)) == blacklist.end())
@@ -290,6 +289,7 @@ void opt_path(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &
 			cout << "th: " << kkk << " " << a->d_ << " " << b->d_ << endl;
 			assert(false);
 		}
+
 		if (blacklist.find(make_edge(b->d_, a->d_)) == blacklist.end())
 		{
 			cout << "fr: " << kkk << " " << b->d_ << " " << a->d_ << endl;
