@@ -1,4 +1,6 @@
 
+#undef NDEBUG
+
 #include <iostream>
 #include <istream>
 #include <ostream>
@@ -17,9 +19,11 @@
 #include <utility>
 #include <vector>
 
+#include "kdt.hxx"
+#include "dq.hxx"
+
 using namespace std;
 
-#undef NDEBUG
 #undef DIAG_IMP_L
 #undef DIAG_PATHG_V
 #define DIAG_PATHG_SUM
@@ -32,11 +36,10 @@ using namespace std;
 #define PROB_SZ 150000
 #define DIM 2
 #define PATH_NUM 2
-#define OPT_ITERS 1500000
+#define OPT_ITERS 300000
 #define OPT_NN_K 64
+#define GAIN_THRESH 10000
 
-typedef double coord;
-typedef vector<coord> point;
 typedef size_t vertex_id;
 typedef unsigned long long edge;
 typedef unsigned long long quad;
@@ -51,265 +54,12 @@ quad make_quad(vertex_id a, vertex_id b, vertex_id c, vertex_id n)
 	return static_cast<quad>(a) | (static_cast<quad>(b) << 18) | (static_cast<quad>(c) << 36) | (static_cast<quad>(n) << 54);
 }
 
-coord sqdiff(coord a, coord b)
-{
-	return (a - b) * (a - b);
-}
-
-coord calc_dist(const point &pt0, const point &pt)
-{
-	return sqrt(inner_product(pt0.begin(), pt0.end(), pt.begin(), 0.0, plus<coord>(), sqdiff));
-}
-
-template<size_t N, typename T> class kdt_node
-{
-	public:
-	point pt_;
-	T data_;
-	kdt_node<N, T> *lc_, *rc_;
-
-	kdt_node(const point &pt, const T &data):
-			pt_(pt), data_(data), lc_(NULL), rc_(NULL)
-	{
-#ifndef NDEBUG
-		assert(pt_.size() == N);
-#endif
-	}
-};
-
-template<size_t N, typename T> class kdt
-{
-	public:
-	kdt_node<N, T> *root_;
-
-	kdt(): root_(NULL)
-	{
-	}
-
-	void add(const point &pt, const T &data)
-	{
-		root_ = add0(pt, data, root_, 0);
-	}
-
-	deque<pair<coord, T> > find_knn(const point &pt, size_t k, bool (*f)(const T &)) const
-	{
-#ifndef NDEBUG
-		assert(pt.size() == N);
-#endif
-
-		deque<pair<coord, T> > res;
-
-		find_knn0(pt, k, root_, 0, res, f);
-
-		return res;
-	}
-
-	kdt_node<N, T> *add0(const point &pt, const T &data, kdt_node<N, T> *node, size_t ix)
-	{
-		if (node == NULL)
-		{
-			return new kdt_node<N, T>(pt, data);
-		}
-
-		if (pt[ix] < node->pt_[ix])
-		{
-			node->lc_ = add0(pt, data, node->lc_, (ix + 1) % N);
-		}
-		else
-		{
-			node->rc_ = add0(pt, data, node->rc_, (ix + 1) % N);
-		}
-
-		return node;
-	}
-
-	void find_knn0(const point &pt, size_t k, kdt_node<N, T> *node, size_t ix, deque<pair<coord, T> > &res,
-			bool (*f)(const T &)) const
-	{
-		if (node == NULL)
-		{
-			return;
-		}
-
-		inject_nn(pt, node->pt_, k, node->data_, res, f);
-
-		if (pt[ix] < node->pt_[ix])
-		{
-			find_knn0(pt, k, node->lc_, (ix + 1) % N, res, f);
-
-			if ((res.size() < k) || (res.back().first > abs(node->pt_[ix] - pt[ix])))
-			{
-				find_knn0(pt, k, node->rc_, (ix + 1) % N, res, f);
-			}
-		}
-		else
-		{
-			find_knn0(pt, k, node->rc_, (ix + 1) % N, res, f);
-
-			if ((res.size() < k) || (res.back().first > abs(node->pt_[ix] - pt[ix])))
-			{
-				find_knn0(pt, k, node->lc_, (ix + 1) % N, res, f);
-			}
-		}
-	}
-
-	void inject_nn(const point &pt0, const point &pt, size_t k, const T &data,
-			deque<pair<coord, T> > &res, bool (*f)(const T &)) const
-	{
-		bool p = (*f)(data);
-
-		if (! p)
-		{
-			return;
-		}
-
-		coord dist = calc_dist(pt0, pt);
-
-		if (res.empty())
-		{
-			res.push_back(make_pair(dist, data));
-
-			return;
-		}
-
-		bool injected = false;
-
-		for (typename deque<pair<coord, T> >::iterator iter = res.begin(); iter != res.end(); ++iter)
-		{
-			if (dist < iter->first)
-			{
-				res.insert(iter, make_pair(dist, data));
-
-				injected = true;
-
-				break;
-			}
-		}
-
-		if (! injected)
-		{
-			res.push_back(make_pair(dist, data));
-		}
-
-		if (res.size() > k)
-		{
-			res.pop_back();
-		}
-	}
-};
-
 /*
 bool f(const int &x)
 {
 	return true;
 }
 */
-
-template<typename T> class dq_node
-{
-	public:
-	T d_;
-	dq_node<T> *prev_;
-	dq_node<T> *next_;
-
-	dq_node(T d, dq_node<T> *prev, dq_node<T> *next):
-			d_(d), prev_(prev), next_(next)
-	{
-	}
-};
-
-// This is REALLY brain-dead. Edge cases ignored. Will blow up if misused.
-template<typename T> class dq
-{
-	public:
-	size_t sz_;
-	dq_node<T> *first_;
-	dq_node<T> *last_;
-
-	dq(): sz_(0), first_(NULL), last_(NULL)
-	{
-	}
-
-	dq(const dq<T> &orig): sz_(0), first_(NULL), last_(NULL)
-	{
-		for (dq_node<T> *iter = orig.first_; iter != NULL; iter = iter->next_)
-		{
-			push_back(iter->d_);
-		}
-	}
-
-	dq<T> &operator=(const dq<T> &rhs)
-	{
-		if (this != (&rhs))
-		{
-			dq_node<T> *q;
-
-			for (dq_node<T> *iter = first_; iter != NULL; iter = q)
-			{
-				q = iter->next_;
-
-				delete iter;
-			}
-
-			sz_ = 0;
-			first_ = NULL;
-			last_ = NULL;
-
-			for (dq_node<T> *iter = rhs.first_; iter != NULL; iter = iter->next_)
-			{
-				push_back(iter->d_);
-			}
-		}
-
-		return *this;
-	}
-
-	void push_back(T d)
-	{
-		dq_node<T> *n = new dq_node<T>(d, last_, NULL);
-
-		if (first_ == NULL)
-		{
-			first_ = last_ = n;
-		}
-		else
-		{
-			last_->next_ = n;
-			last_ = n;
-		}
-	}
-
-	T back()
-	{
-		return last_->d_;
-	}
-
-	void pop_back()
-	{
-		dq_node<T> *cur_last = last_;
-
-		last_ = cur_last->prev_;
-
-		if (last_ == NULL)
-		{
-			first_ = NULL;
-		}
-		else
-		{
-			last_->next_ = NULL;
-		}
-
-		delete cur_last;
-	}
-
-	void insert(dq_node<T> *n, T d)
-	{
-		dq_node<T> *p = n->prev_;
-		dq_node<T> *c = new dq_node<T>(d, p, n);
-		p->next_ = c;
-		n->prev_ = c;
-	}
-};
 
 class path
 {
@@ -599,7 +349,7 @@ void simul_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<ed
 
 		oldbest = bestscore;
 
-		if (curscore <= (bestscore - 10000))
+		if (curscore <= (bestscore - GAIN_THRESH))
 		{
 			bestscore = curscore;
 
