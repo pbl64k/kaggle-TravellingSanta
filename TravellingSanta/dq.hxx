@@ -3,6 +3,8 @@
 
 #define INCLUDE__DQ_HXX
 
+#include <cassert>
+
 template<typename T> class dq_node
 {
 	public:
@@ -14,8 +16,37 @@ template<typename T> class dq_node
 			d_(d), prev_(prev), next_(next)
 	{
 	}
+
+	dq_node(const dq_node<T> &orig):
+			d_(orig.d_), prev_(orig.prev_), next_(orig.next_)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+	}
+
+	~dq_node()
+	{
+	}
+
+	dq_node<T> &operator=(const dq_node<T> &rhs)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+
+		if (this != (&rhs))
+		{
+			d_ = rhs.d_;
+			prev_ = rhs.prev_;
+			next_ = rhs.next_;
+		}
+
+		return *this;
+	}
 };
 
+// Don't touch mah stuff.
 template<typename T> class dq
 {
 	public:
@@ -32,6 +63,18 @@ template<typename T> class dq
 		for (dq_node<T> *iter = orig.first_; iter != NULL; iter = iter->next_)
 		{
 			push_back(iter->d_);
+		}
+	}
+
+	~dq()
+	{
+		dq_node<T> *q;
+
+		for (dq_node<T> *iter = first_; iter != NULL; iter = q)
+		{
+			q = iter->next_;
+
+			delete iter;
 		}
 	}
 
@@ -83,6 +126,10 @@ template<typename T> class dq
 
 	void pop_back()
 	{
+#ifndef NDEBUG
+		assert(last_ != NULL);
+#endif
+
 		dq_node<T> *cur_last = last_;
 
 		last_ = cur_last->prev_;
@@ -99,12 +146,40 @@ template<typename T> class dq
 		delete cur_last;
 	}
 
+	// Make sure you're NOT using a pointer into a wrong dq.
+	// 'Cause I ain't gonna catch that.
 	void insert(dq_node<T> *n, T d)
 	{
-		dq_node<T> *p = n->prev_;
+		dq_node<T> *p;
+
+		if (n != NULL)
+		{
+			p = n->prev_;
+		}
+		else
+		{
+			p = last_;
+		}
+
 		dq_node<T> *c = new dq_node<T>(d, p, n);
-		p->next_ = c;
-		n->prev_ = c;
+
+		if (p != NULL)
+		{
+			p->next_ = c;
+		}
+		else
+		{
+			first_ = c;
+		}
+
+		if (n != NULL)
+		{
+			n->prev_ = c;
+		}
+		else
+		{
+			last_ = c;
+		}
 	}
 };
 

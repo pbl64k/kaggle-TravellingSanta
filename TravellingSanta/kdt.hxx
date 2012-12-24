@@ -21,7 +21,8 @@ coord sqdiff(coord a, coord b)
 
 coord calc_dist(const point &pt0, const point &pt)
 {
-	return std::sqrt(std::inner_product(pt0.begin(), pt0.end(), pt.begin(), 0.0, std::plus<coord>(), sqdiff));
+	return std::sqrt(std::inner_product(pt0.begin(), pt0.end(), pt.begin(), 0.0,
+			std::plus<coord>(), sqdiff));
 }
 
 template<size_t N, typename T> class kdt_node
@@ -38,6 +39,35 @@ template<size_t N, typename T> class kdt_node
 		assert(pt_.size() == N);
 #endif
 	}
+
+	kdt_node(const kdt_node<N, T> &orig):
+			pt_(orig.pt_), data_(orig.data_), lc_(orig.lc_), rc_(orig.rc_)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+	}
+
+	~kdt_node()
+	{
+	}
+
+	kdt_node<N, T> &operator=(const kdt_node<N, T> &rhs)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+
+		if (this != (&rhs))
+		{
+			pt_ = rhs.pt_;
+			data_ = rhs.data_;
+			lc_ = rhs.lc_;
+			rc_ = rhs.rc_;
+		}
+
+		return *this;
+	}
 };
 
 template<size_t N, typename T> class kdt
@@ -49,12 +79,39 @@ template<size_t N, typename T> class kdt
 	{
 	}
 
+	kdt(const kdt<N, T> &orig): root_(orig.root_)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+	}
+
+	~kdt()
+	{
+		// Meh... I can't be bothered to write proper copying and disposal.
+	}
+
+	kdt<N, T> &operator=(const kdt<N, T> &rhs)
+	{
+#ifndef NDEBUG
+		assert(false);
+#endif
+
+		if (this != (&rhs))
+		{
+			root_ = rhs.root_;
+		}
+
+		return *this;
+	}
+
 	void add(const point &pt, const T &data)
 	{
 		root_ = add0(pt, data, root_, 0);
 	}
 
-	std::deque<std::pair<coord, T> > find_knn(const point &pt, size_t k, bool (*f)(const T &)) const
+	std::deque<std::pair<coord, T> > find_knn(const point &pt, size_t k,
+			bool (*f)(const T &)) const
 	{
 #ifndef NDEBUG
 		assert(pt.size() == N);
@@ -67,7 +124,8 @@ template<size_t N, typename T> class kdt
 		return res;
 	}
 
-	kdt_node<N, T> *add0(const point &pt, const T &data, kdt_node<N, T> *node, size_t ix)
+	kdt_node<N, T> *add0(const point &pt, const T &data, kdt_node<N, T> *node,
+			size_t ix)
 	{
 		if (node == NULL)
 		{
@@ -86,8 +144,8 @@ template<size_t N, typename T> class kdt
 		return node;
 	}
 
-	void find_knn0(const point &pt, size_t k, kdt_node<N, T> *node, size_t ix, std::deque<std::pair<coord, T> > &res,
-			bool (*f)(const T &)) const
+	void find_knn0(const point &pt, size_t k, kdt_node<N, T> *node, size_t ix,
+			std::deque<std::pair<coord, T> > &res, bool (*f)(const T &)) const
 	{
 		if (node == NULL)
 		{
@@ -100,7 +158,8 @@ template<size_t N, typename T> class kdt
 		{
 			find_knn0(pt, k, node->lc_, (ix + 1) % N, res, f);
 
-			if ((res.size() < k) || (res.back().first > abs(node->pt_[ix] - pt[ix])))
+			if ((res.size() < k) ||
+					(res.back().first > abs(node->pt_[ix] - pt[ix])))
 			{
 				find_knn0(pt, k, node->rc_, (ix + 1) % N, res, f);
 			}
@@ -109,7 +168,8 @@ template<size_t N, typename T> class kdt
 		{
 			find_knn0(pt, k, node->rc_, (ix + 1) % N, res, f);
 
-			if ((res.size() < k) || (res.back().first > abs(node->pt_[ix] - pt[ix])))
+			if ((res.size() < k) ||
+					(res.back().first > abs(node->pt_[ix] - pt[ix])))
 			{
 				find_knn0(pt, k, node->lc_, (ix + 1) % N, res, f);
 			}
@@ -137,7 +197,8 @@ template<size_t N, typename T> class kdt
 
 		bool injected = false;
 
-		for (typename std::deque<std::pair<coord, T> >::iterator iter = res.begin(); iter != res.end(); ++iter)
+		for (typename std::deque<std::pair<coord, T> >::iterator iter = res.begin();
+				iter != res.end(); ++iter)
 		{
 			if (dist < iter->first)
 			{
