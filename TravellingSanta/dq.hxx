@@ -117,6 +117,8 @@ template<typename T> class dq
 			last_->next_ = n;
 			last_ = n;
 		}
+		
+		++sz_;
 	}
 
 	T back()
@@ -144,6 +146,8 @@ template<typename T> class dq
 		}
 
 		delete cur_last;
+
+		--sz_;
 	}
 
 	// Make sure you're NOT using a pointer into a wrong dq.
@@ -180,6 +184,8 @@ template<typename T> class dq
 		{
 			last_ = c;
 		}
+
+		++sz_;
 	}
 };
 

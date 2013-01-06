@@ -146,6 +146,22 @@ template<typename T> class qxt
 	void add_edge(const qx_edge &e, const T& data)
 	{
 #ifndef NDEBUG
+		assert(top_);
+#endif
+
+		if ((e.first[0] > e.second[0]) || ((e.first[0] == e.second[0]) && (e.first[1] > e.second[1])))
+		{
+			add_edge0(make_pair(e.second, e.first), data);
+		}
+		else
+		{
+			add_edge0(e, data);
+		}
+	}
+
+	void add_edge0(const qx_edge &e, const T& data)
+	{
+#ifndef NDEBUG
 		if (top_)
 		{
 			assert(e.first[0] >= tl_[0]);
@@ -167,15 +183,31 @@ template<typename T> class qxt
 			}
 			else
 			{
-				q1_->add_edge(e, data);
-				q2_->add_edge(e, data);
-				q3_->add_edge(e, data);
-				q4_->add_edge(e, data);
+				q1_->add_edge0(e, data);
+				q2_->add_edge0(e, data);
+				q3_->add_edge0(e, data);
+				q4_->add_edge0(e, data);
 			}
 		}
 	}
 
 	void del_edge(const qx_edge &e)
+	{
+#ifndef NDEBUG
+		assert(top_);
+#endif
+
+		if ((e.first[0] > e.second[0]) || ((e.first[0] == e.second[0]) && (e.first[1] > e.second[1])))
+		{
+			del_edge0(make_pair(e.second, e.first));
+		}
+		else
+		{
+			del_edge0(e);
+		}
+	}
+
+	void del_edge0(const qx_edge &e)
 	{
 #ifndef NDEBUG
 		if (top_)
@@ -195,14 +227,14 @@ template<typename T> class qxt
 		{
 			if (depth_ == 0)
 			{
-				es_.erase(es_.find(e));
+				assert(es_.erase(e) == 1);
 			}
 			else
 			{
-				q1_->del_edge(e);
-				q2_->del_edge(e);
-				q3_->del_edge(e);
-				q4_->del_edge(e);
+				q1_->del_edge0(e);
+				q2_->del_edge0(e);
+				q3_->del_edge0(e);
+				q4_->del_edge0(e);
 			}
 		}
 	}
@@ -239,9 +271,9 @@ template<typename T> class qxt
 						iter != es_.end(); ++iter)
 				{
 					if (xsect2(e.first[0], e.first[1], e.second[0], e.second[1],
-							iter->first[0], iter->first[1], iter->second[0], iter->second[1]))
+							iter->first.first[0], iter->first.first[1], iter->first.second[0], iter->first.second[1]))
 					{
-						res.add(iter->second);
+						res.insert(iter->second);
 					}
 				}
 			}

@@ -36,6 +36,7 @@ using namespace std;
 #define DIAG_OPTX_ITER
 #define DIAG_OPTX_ITSC
 #define DIAG_OPTX_INIT
+#define DIAG_OPTX_CAND
 #define DIAG_OPTX_SUM
 
 #define PROB_SZ 150000
@@ -44,8 +45,8 @@ using namespace std;
 #define OPT_ITERS 300000
 #define OPT_NN_K 64
 #define GAIN_THRESH 10000
-#define XOPT_ITERS 1
-#define XOPT_TGT 8000000
+#define XOPT_ITERS 1000000
+#define XOPT_TGT 7500000
 
 typedef size_t vertex_id;
 typedef unsigned long long edge;
@@ -70,17 +71,18 @@ class path
 	vertex_id cur_;
 	dq<vertex_id> p_;
 	vector<dq_node<vertex_id> *> vs_;
+	vector<vertex_id> vvs_;
 	vector<list<vertex_id> > es_;
 	qxt<pair<vertex_id, vertex_id> > qxes_;
 
-	path(): dist_(0.0), cur_(0), p_(), vs_(PROB_SZ), es_(PROB_SZ),
+	path(): dist_(0.0), cur_(0), p_(), vs_(PROB_SZ), vvs_(PROB_SZ), es_(PROB_SZ),
 			qxes_()
 	{
 	}
 
 	// qxt blows up on copy and assignment. just as planned.
 	path(const path &orig): dist_(orig.dist_), cur_(orig.cur_),
-			p_(orig.p_), vs_(orig.vs_), es_(orig.es_), qxes_()
+			p_(orig.p_), vs_(orig.vs_), vvs_(orig.vvs_), es_(orig.es_), qxes_()
 	{
 	}
 
@@ -96,6 +98,7 @@ class path
 			cur_ = rhs.cur_;
 			p_ = rhs.p_;
 			vs_ = rhs.vs_;
+			vvs_ = rhs.vvs_;
 			es_ = rhs.es_;
 		}
 
@@ -107,6 +110,7 @@ class path
 		cur_ = city;
 		p_.push_back(cur_);
 		vs_[cur_] = p_.first_;
+		vvs_[cur_] = p_.sz_ - 1;
 	}
 
 	void add(const pair<coord, vertex_id> &pt)
@@ -118,6 +122,7 @@ class path
 		cur_ = pt.second;
 		p_.push_back(cur_);
 		vs_[cur_] = p_.last_;
+		vvs_[cur_] = p_.sz_ - 1;
 	}
 };
 
@@ -389,7 +394,7 @@ void simul_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<ed
 	}
 }
 
-void opt_x(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &blacklist, vertex_id seed)
+bool opt_x(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &blacklist, vertex_id seed)
 {
 	random_device rng;
 	uniform_int_distribution<vertex_id> rng_dst(0, PROB_SZ - 1);
@@ -400,11 +405,189 @@ void opt_x(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &bla
 	cout << "Initial vertex: " << start << endl;
 #endif
 
-	/*
-	for ()
+	for (vertex_id a0 = start; a0 != start + PROB_SZ; ++a0)
 	{
+		vertex_id a = a0 % PROB_SZ;
+
+		for (list<vertex_id>::iterator iter = pth.es_[a].begin(); iter != pth.es_[a].end(); ++iter)
+		{
+			set<pair<vertex_id, vertex_id> > xs = pth.qxes_.find_x(make_pair(cities[a], cities[*iter]));
+
+			for (set<pair<vertex_id, vertex_id> >::iterator s_iter = xs.begin(); s_iter != xs.end(); ++s_iter)
+			{
+				if ((s_iter->first == a) || (s_iter->first == (*iter)) || (s_iter->second == a) || (s_iter->second == (*iter)))
+				{
+					continue;
+				}
+
+				vertex_id v1, v2, v3, v4;
+
+				if (pth.vvs_[a] < pth.vvs_[s_iter->first])
+				{
+					v1 = a;
+					v2 = (*iter);
+					v3 = s_iter->first;
+					v4 = s_iter->second;
+				}
+				else
+				{
+					v1 = s_iter->first;
+					v2 = s_iter->second;
+					v3 = a;
+					v4 = (*iter);
+				}
+
+				if (pth.vvs_[v1] > pth.vvs_[v2])
+				{
+					swap(v1, v2);
+				}
+
+				if (pth.vvs_[v3] > pth.vvs_[v4])
+				{
+					swap(v3, v4);
+				}
+
+				if ((blacklist.find(make_edge(v1, v3)) != blacklist.end()) ||
+						(blacklist.find(make_edge(v2, v4)) != blacklist.end()))
+				{
+					continue;
+				}
+
+#ifdef DIAG_OPTX_CAND
+				cout << "Candidate found: " << a << "-" << (*iter) << " intersects with " << s_iter->first << "-" << s_iter->second << endl;
+				cout << "(" << v1 << "-" << v2 << ", " << v3 << "-" << v4 << ")" << endl;
+				cout << "(" << pth.vvs_[v1] << "-" << pth.vvs_[v2] << ", " << pth.vvs_[v3] << "-" << pth.vvs_[v4] << ")" << endl;
+				cout << "(" << v1 << "-" << v3 << ", " << v2 << "-" << v4 << ")" << endl;
+				cout << "Exchanging edges..." << endl;
+#endif
+
+#ifndef NDEBUG
+				/*
+				if (pth.vvs_[v1] + 1 != pth.vvs_[v2])
+				{
+					cout << v1 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v1].begin(); it1 != pth.es_[v1].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+					cout << v2 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v2].begin(); it1 != pth.es_[v2].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+				}
+
+				if (pth.vvs_[v3] + 1 != pth.vvs_[v4])
+				{
+					cout << v3 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v3].begin(); it1 != pth.es_[v3].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+					cout << v4 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v4].begin(); it1 != pth.es_[v4].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+				}
+				*/
+
+				assert(pth.vvs_[v1] + 1 == pth.vvs_[v2]);
+				assert(pth.vvs_[v3] + 1 == pth.vvs_[v4]);
+				assert(pth.vvs_[v2] < pth.vvs_[v3]);
+#endif
+
+				pth.dist_ += calc_dist(cities[v1], cities[v3]) + calc_dist(cities[v2], cities[v4]) -
+						calc_dist(cities[v1], cities[v2]) - calc_dist(cities[v3], cities[v4]);
+
+				pth.qxes_.del_edge(make_pair(cities[v1], cities[v2]));
+				pth.qxes_.del_edge(make_pair(cities[v3], cities[v4]));
+				pth.qxes_.add_edge(make_pair(cities[v1], cities[v3]), make_pair(v1, v3));
+				pth.qxes_.add_edge(make_pair(cities[v2], cities[v4]), make_pair(v2, v4));
+
+				assert(blacklist.erase(make_edge(v1, v2)) == 1);
+				assert(blacklist.erase(make_edge(v2, v1)) == 1);
+				assert(blacklist.erase(make_edge(v3, v4)) == 1);
+				assert(blacklist.erase(make_edge(v4, v3)) == 1);
+				blacklist.insert(make_edge(v1, v3));
+				blacklist.insert(make_edge(v3, v1));
+				blacklist.insert(make_edge(v2, v4));
+				blacklist.insert(make_edge(v4, v2));
+			
+				pth.es_[v1].remove(v2);
+				pth.es_[v2].remove(v1);
+				pth.es_[v3].remove(v4);
+				pth.es_[v4].remove(v3);
+#ifndef NDEBUG
+				/*
+				if (pth.es_[v1].size() > 1 || pth.es_[v2].size() > 1 || pth.es_[v3].size() > 1 || pth.es_[v4].size() > 1)
+				{
+					cout << v1 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v1].begin(); it1 != pth.es_[v1].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+					cout << v2 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v2].begin(); it1 != pth.es_[v2].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+					cout << v3 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v3].begin(); it1 != pth.es_[v3].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+					cout << v4 << " ";
+					for (list<vertex_id>::iterator it1 = pth.es_[v4].begin(); it1 != pth.es_[v4].end(); ++it1)
+					{
+						cout << (*it1) << " ";
+					}
+					cout << endl;
+				}
+				*/
+
+				assert(pth.es_[v1].size() < 2);
+				assert(pth.es_[v2].size() < 2);
+				assert(pth.es_[v3].size() < 2);
+				assert(pth.es_[v4].size() < 2);
+#endif
+				pth.es_[v1].push_back(v3);
+				pth.es_[v3].push_back(v1);
+				pth.es_[v2].push_back(v4);
+				pth.es_[v4].push_back(v2);
+
+				dq_node<vertex_id> *n1 = pth.vs_[v2];
+				dq_node<vertex_id> *n2 = pth.vs_[v3];
+
+				while (n1 != n2)
+				{
+					//cout << "XCHG " << n1 << " " << n2 << " N" << n1->d_ << " N" << n2->d_ << " P" << pth.vvs_[n1->d_] << " P" << pth.vvs_[n2->d_] << endl;
+					swap(pth.vvs_[n1->d_], pth.vvs_[n2->d_]);
+					swap(pth.vs_[n1->d_], pth.vs_[n2->d_]);
+					swap(n1->d_, n2->d_);
+
+					if (n1->next_ == n2)
+					{
+						break;
+					}
+
+					n1 = n1->next_;
+					n2 = n2->prev_;
+				}
+
+				return true;
+			}
+		}
 	}
-	*/
+
+	return false;
 }
 
 void x_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<edge> &blacklist, size_t maxiters, size_t tgt)
@@ -430,7 +613,15 @@ void x_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<edge> 
 			}
 		}
 
-		opt_x(s_kdt, *((*paths)[n]), blacklist, n);
+		if (! opt_x(s_kdt, *((*paths)[n]), blacklist, n))
+		{
+			return;
+
+			if (! opt_x(s_kdt, *((*paths)[1 - n]), blacklist, 1 - n))
+			{
+				return;
+			}
+		}
 
 		coord curscore = 0;
 
