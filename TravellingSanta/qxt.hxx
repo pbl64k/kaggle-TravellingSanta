@@ -5,7 +5,7 @@
 
 #include <cassert>
 
-#include <list>
+#include <map>
 #include <utility>
 
 #include "cartesian.hxx"
@@ -18,18 +18,54 @@ template<typename T> class qxt
 	bool sanity_;
 	size_t depth_;
 	point tl_, br_, mid_;
-	std::list<std::pair<qx_edge, T> > es_;
+	std::map<qx_edge, T> es_;
 	qxt<T> *q1_;
 	qxt<T> *q2_;
 	qxt<T> *q3_;
 	qxt<T> *q4_;
+
+	qxt():
+			sanity_(true), depth_(10), tl_(2), br_(2), mid_(),
+			es_(), q1_(NULL), q2_(NULL), q3_(NULL), q4_(NULL)
+	{
+		tl_[0] = 0.0;
+		tl_[1] = 0.0;
+		br_[0] = 20000.0;
+		br_[1] = 20000.0;
+		
+		if (depth_ > 0)
+		{
+			coord xm = (tl_[0] / 2.0) + (br_[0] / 2.0);
+			coord ym = (tl_[1] / 2.0) + (br_[1] / 2.0);
+			point mid(2);
+			mid[0] = xm;
+			mid[1] = ym;
+
+			mid_ = mid;
+
+			q1_ = new qxt<T>(false, depth_ - 1, tl_, mid_);
+			q4_ = new qxt<T>(false, depth_ - 1, mid_, br_);
+			point p1(2);
+			point p2(2);
+			p1[0] = mid_[0];
+			p1[1] = tl_[1];
+			p2[0] = br_[0];
+			p2[1] = mid_[1];
+			q2_ = new qxt<T>(false, depth_ - 1, p1, p2);
+			p1[0] = tl_[0];
+			p1[1] = mid_[1];
+			p2[0] = mid_[0];
+			p2[1] = br_[1];
+			q3_ = new qxt<T>(false, depth_ - 1, p1, p2);
+		}
+	}
 
 	qxt(bool sanity, size_t depth, point tl, point br):
 			sanity_(sanity), depth_(depth), tl_(tl), br_(br), mid_(),
 			es_(), q1_(NULL), q2_(NULL), q3_(NULL), q4_(NULL)
 	{
 #ifndef NDEBUG
-		assert(depth_ >= 0);
+		assert(depth_ < 24);
 		assert(tl_.size() == 2);
 		assert(br_.size() == 2);
 		assert(tl_[0] < br_[0]);
@@ -106,7 +142,7 @@ template<typename T> class qxt
 		return *this;
 	}
 
-	void add_edge(const qx_edge &e)
+	void add_edge(const qx_edge &e, const T& data)
 	{
 #ifndef NDEBUG
 		if (sanity_)
@@ -121,6 +157,73 @@ template<typename T> class qxt
 			assert(e.second[1] <= br_[1]);
 		}
 #endif
+
+		if (intersects(e))
+		{
+			if (depth_ == 0)
+			{
+				es_[e] = data;
+			}
+			else
+			{
+				q1_->add_edge(e, data);
+				q2_->add_edge(e, data);
+				q3_->add_edge(e, data);
+				q4_->add_edge(e, data);
+			}
+		}
+	}
+
+	void del_edge(const qx_edge &e)
+	{
+#ifndef NDEBUG
+		if (sanity_)
+		{
+			assert(e.first[0] >= tl_[0]);
+			assert(e.first[1] >= tl_[1]);
+			assert(e.first[0] <= br_[0]);
+			assert(e.first[1] <= br_[1]);
+			assert(e.second[0] >= tl_[0]);
+			assert(e.second[1] >= tl_[1]);
+			assert(e.second[0] <= br_[0]);
+			assert(e.second[1] <= br_[1]);
+		}
+#endif
+
+		if (intersects(e))
+		{
+			if (depth_ == 0)
+			{
+				es_.erase(es_.find(e));
+			}
+			else
+			{
+				q1_->del_edge(e);
+				q2_->del_edge(e);
+				q3_->del_edge(e);
+				q4_->del_edge(e);
+			}
+		}
+	}
+
+	bool intersects(const qx_edge &e) const
+	{
+		if (((e.first[0] >= tl_[0]) &&
+				(e.first[0] <= br_[0]) &&
+				(e.first[1] >= tl_[1]) &&
+				(e.first[1] <= br_[1])) ||
+				((e.second[0] >= tl_[0]) &&
+				(e.second[0] <= br_[0]) &&
+				(e.second[1] >= tl_[1]) &&
+				(e.second[1] <= br_[1])))
+		{
+			return true;
+		}
+
+		return xsect2(e.first[0], e.first[1], e.second[0], e.second[1], tl_[0], tl_[1], br_[0], tl_[1]) ||
+				xsect2(e.first[0], e.first[1], e.second[0], e.second[1], tl_[0], tl_[1], tl_[0], br_[1]) ||
+				xsect2(e.first[0], e.first[1], e.second[0], e.second[1], br_[0], tl_[1], br_[0], br_[1]) ||
+				xsect2(e.first[0], e.first[1], e.second[0], e.second[1], tl_[0], br_[1], br_[0], br_[1]);
 	}
 };
 

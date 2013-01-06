@@ -26,7 +26,7 @@
 using namespace std;
 
 #undef DIAG_IMP_L
-#undef DIAG_PATHG_V
+#define DIAG_PATHG_V
 #define DIAG_PATHG_SUM
 #define DIAG_OPTS_O
 #define DIAG_OPTS_OMOD 1000
@@ -55,6 +55,8 @@ quad make_quad(vertex_id a, vertex_id b, vertex_id c, vertex_id n)
 	return static_cast<quad>(a) | (static_cast<quad>(b) << 18) | (static_cast<quad>(c) << 36) | (static_cast<quad>(n) << 54);
 }
 
+vector<point> cities(PROB_SZ);
+
 class path
 {
 	public:
@@ -63,13 +65,16 @@ class path
 	dq<vertex_id> p_;
 	vector<dq_node<vertex_id> *> vs_;
 	vector<list<vertex_id> > es_;
+	qxt<pair<vertex_id, vertex_id> > qxes_;
 
-	path(): dist_(0.0), cur_(0), p_(), vs_(PROB_SZ), es_(PROB_SZ)
+	path(): dist_(0.0), cur_(0), p_(), vs_(PROB_SZ), es_(PROB_SZ),
+			qxes_()
 	{
 	}
 
+	// qxt blows up on copy and assignment. just as planned.
 	path(const path &orig): dist_(orig.dist_), cur_(orig.cur_),
-			p_(orig.p_), vs_(orig.vs_), es_(orig.es_)
+			p_(orig.p_), vs_(orig.vs_), es_(orig.es_), qxes_()
 	{
 	}
 
@@ -102,14 +107,13 @@ class path
 	{
 		es_[cur_].push_back(pt.second);
 		es_[pt.second].push_back(cur_);
+		qxes_.add_edge(make_pair(cities[cur_], cities[pt.second]), make_pair(cur_, pt.second));
 		dist_ += pt.first;
 		cur_ = pt.second;
 		p_.push_back(cur_);
 		vs_[cur_] = p_.last_;
 	}
 };
-
-vector<point> cities(PROB_SZ);
 
 kdt<DIM, vertex_id> s_kdt;
 
@@ -418,11 +422,13 @@ int main()
 	cout << "Pathgen complete: " << paths[0]->dist_ << " " << paths[1]->dist_ << endl;
 #endif
 
+/*
 	simul_opt(s_kdt, &paths, blacklist, OPT_ITERS, OPT_NN_K);
 
 #ifdef DIAG_OPTS_SUM
 	cout << "Simulopt complete: " << paths[0]->dist_ << " " << paths[1]->dist_ << endl;
 #endif
+*/
 
 	fstream csv("./sol.csv", ios_base::out);
 
