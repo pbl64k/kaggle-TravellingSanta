@@ -4,26 +4,12 @@
 #define INCLUDE__KDT_HXX
 
 #include <cassert>
-#include <cmath>
 
 #include <deque>
-#include <numeric>
 #include <utility>
 #include <vector>
 
-typedef double coord;
-typedef std::vector<coord> point;
-
-coord sqdiff(coord a, coord b)
-{
-	return (a - b) * (a - b);
-}
-
-coord calc_dist(const point &pt0, const point &pt)
-{
-	return std::sqrt(std::inner_product(pt0.begin(), pt0.end(), pt.begin(), 0.0,
-			std::plus<coord>(), sqdiff));
-}
+#include "cartesian.hxx"
 
 template<size_t N, typename T> class kdt_node
 {

@@ -21,6 +21,7 @@
 
 #include "kdt.hxx"
 #include "dq.hxx"
+#include "qxt.hxx"
 
 using namespace std;
 
