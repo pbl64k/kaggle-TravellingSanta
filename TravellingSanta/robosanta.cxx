@@ -50,7 +50,7 @@ using namespace std;
 #define GAIN_THRESH 10000
 #define XOPT_ITERS 100000
 #define XOPT_TGT 7500000
-#define OPT2_ITERS 100000
+#define OPT2_ITERS 1000000
 #define OPT2_TGT 7500000
 
 typedef size_t vertex_id;
