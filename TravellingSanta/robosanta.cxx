@@ -33,6 +33,10 @@ using namespace std;
 #undef DIAG_OPTS_GAIN
 #undef DIAG_OPTS_WHOOPS
 #define DIAG_OPTS_SUM
+#define DIAG_OPTX_ITER
+#define DIAG_OPTX_ITSC
+#define DIAG_OPTX_INIT
+#define DIAG_OPTX_SUM
 
 #define PROB_SZ 150000
 #define DIM 2
@@ -40,6 +44,8 @@ using namespace std;
 #define OPT_ITERS 300000
 #define OPT_NN_K 64
 #define GAIN_THRESH 10000
+#define XOPT_ITERS 1
+#define XOPT_TGT 8000000
 
 typedef size_t vertex_id;
 typedef unsigned long long edge;
@@ -383,6 +389,66 @@ void simul_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<ed
 	}
 }
 
+void opt_x(const kdt<DIM, vertex_id> &s_kdt, path &pth, unordered_set<edge> &blacklist, vertex_id seed)
+{
+	random_device rng;
+	uniform_int_distribution<vertex_id> rng_dst(0, PROB_SZ - 1);
+
+	vertex_id start = rng_dst(rng);
+
+#ifdef DIAG_OPTX_INIT
+	cout << "Initial vertex: " << start << endl;
+#endif
+
+	/*
+	for ()
+	{
+	}
+	*/
+}
+
+void x_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<edge> &blacklist, size_t maxiters, size_t tgt)
+{
+	size_t iter_num = 0;
+	bool tgt_met = false;
+
+	while ((iter_num < maxiters) && (! tgt_met))
+	{
+#ifdef DIAG_OPTX_ITER
+		cout << "Iteration #" << (iter_num + 1) << endl;
+#endif
+
+		size_t n = 0;
+		coord dn = (*paths)[n]->dist_;
+
+		for (size_t nn = 1; nn != PATH_NUM; ++nn)
+		{
+			if ((*paths)[nn]->dist_ > dn)
+			{
+				n = nn;
+				dn = (*paths)[n]->dist_;
+			}
+		}
+
+		opt_x(s_kdt, *((*paths)[n]), blacklist, n);
+
+		coord curscore = 0;
+
+		for (size_t i = 0; i != PATH_NUM; ++i)
+		{
+			curscore = max(curscore, (*paths)[i]->dist_);
+		}
+
+#ifdef DIAG_OPTX_ITSC
+		cout << "Score: " << curscore << endl;
+#endif
+
+		tgt_met = curscore <= tgt;
+
+		++iter_num;
+	}
+}
+
 int main()
 {
 	srand(time(NULL));
@@ -429,6 +495,12 @@ int main()
 	cout << "Simulopt complete: " << paths[0]->dist_ << " " << paths[1]->dist_ << endl;
 #endif
 */
+
+	x_opt(s_kdt, &paths, blacklist, XOPT_ITERS, XOPT_TGT);
+
+#ifdef DIAG_OPTX_SUM
+	cout << "Xopt complete: " << paths[0]->dist_ << " " << paths[1]->dist_ << endl;
+#endif
 
 	fstream csv("./sol.csv", ios_base::out);
 

@@ -6,6 +6,7 @@
 #include <cassert>
 
 #include <map>
+#include <set>
 #include <utility>
 
 #include "cartesian.hxx"
@@ -15,7 +16,7 @@ typedef std::pair<point, point> qx_edge;
 template<typename T> class qxt
 {
 	public:
-	bool sanity_;
+	bool top_;
 	size_t depth_;
 	point tl_, br_, mid_;
 	std::map<qx_edge, T> es_;
@@ -25,7 +26,7 @@ template<typename T> class qxt
 	qxt<T> *q4_;
 
 	qxt():
-			sanity_(true), depth_(10), tl_(2), br_(2), mid_(),
+			top_(true), depth_(10), tl_(2), br_(2), mid_(),
 			es_(), q1_(NULL), q2_(NULL), q3_(NULL), q4_(NULL)
 	{
 		tl_[0] = 0.0;
@@ -60,8 +61,8 @@ template<typename T> class qxt
 		}
 	}
 
-	qxt(bool sanity, size_t depth, point tl, point br):
-			sanity_(sanity), depth_(depth), tl_(tl), br_(br), mid_(),
+	qxt(bool top, size_t depth, point tl, point br):
+			top_(top), depth_(depth), tl_(tl), br_(br), mid_(),
 			es_(), q1_(NULL), q2_(NULL), q3_(NULL), q4_(NULL)
 	{
 #ifndef NDEBUG
@@ -99,7 +100,7 @@ template<typename T> class qxt
 		}
 	}
 
-	qxt(const qxt<T> &orig): sanity_(orig.sanity_), depth_(orig.depth_),
+	qxt(const qxt<T> &orig): top_(orig.top_), depth_(orig.depth_),
 			tl_(orig.tl_), br_(orig.br_), mid_(orig.mid_), es_(orig.es_),
 			q1_(orig.q1_), q2_(orig.q2_), q3_(orig.q3_), q4_(orig.q4_)
 	{
@@ -127,7 +128,7 @@ template<typename T> class qxt
 
 		if (this != (&rhs))
 		{
-			sanity_ = rhs.sanity_;
+			top_ = rhs.top_;
 			depth_ = rhs.depth_;
 			tl_ = rhs.tl_;
 			br_ = rhs.br_;
@@ -145,7 +146,7 @@ template<typename T> class qxt
 	void add_edge(const qx_edge &e, const T& data)
 	{
 #ifndef NDEBUG
-		if (sanity_)
+		if (top_)
 		{
 			assert(e.first[0] >= tl_[0]);
 			assert(e.first[1] >= tl_[1]);
@@ -177,7 +178,7 @@ template<typename T> class qxt
 	void del_edge(const qx_edge &e)
 	{
 #ifndef NDEBUG
-		if (sanity_)
+		if (top_)
 		{
 			assert(e.first[0] >= tl_[0]);
 			assert(e.first[1] >= tl_[1]);
@@ -202,6 +203,54 @@ template<typename T> class qxt
 				q2_->del_edge(e);
 				q3_->del_edge(e);
 				q4_->del_edge(e);
+			}
+		}
+	}
+
+	std::set<T> find_x(const qx_edge &e) const
+	{
+#ifndef NDEBUG
+		assert(top_);
+
+		assert(e.first[0] >= tl_[0]);
+		assert(e.first[1] >= tl_[1]);
+		assert(e.first[0] <= br_[0]);
+		assert(e.first[1] <= br_[1]);
+		assert(e.second[0] >= tl_[0]);
+		assert(e.second[1] >= tl_[1]);
+		assert(e.second[0] <= br_[0]);
+		assert(e.second[1] <= br_[1]);
+#endif
+
+		std::set<T> res;
+
+		find_x0(e, res);
+
+		return res;
+	}
+
+	void find_x0(const qx_edge &e, std::set<T> &res) const
+	{
+		if (intersects(e))
+		{
+			if (depth_ == 0)
+			{
+				for (typename std::map<qx_edge, T>::const_iterator iter = es_.begin();
+						iter != es_.end(); ++iter)
+				{
+					if (xsect2(e.first[0], e.first[1], e.second[0], e.second[1],
+							iter->first[0], iter->first[1], iter->second[0], iter->second[1]))
+					{
+						res.add(iter->second);
+					}
+				}
+			}
+			else
+			{
+				q1_->find_x0(e, res);
+				q2_->find_x0(e, res);
+				q3_->find_x0(e, res);
+				q4_->find_x0(e, res);
 			}
 		}
 	}
