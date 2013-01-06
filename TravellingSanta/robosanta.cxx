@@ -45,7 +45,7 @@ using namespace std;
 #define OPT_ITERS 300000
 #define OPT_NN_K 64
 #define GAIN_THRESH 10000
-#define XOPT_ITERS 1000000
+#define XOPT_ITERS 100000
 #define XOPT_TGT 7500000
 
 typedef size_t vertex_id;
@@ -615,8 +615,6 @@ void x_opt(const kdt<DIM, vertex_id> &s_kdt, path ***paths, unordered_set<edge> 
 
 		if (! opt_x(s_kdt, *((*paths)[n]), blacklist, n))
 		{
-			return;
-
 			if (! opt_x(s_kdt, *((*paths)[1 - n]), blacklist, 1 - n))
 			{
 				return;
