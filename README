@@ -1,0 +1,26 @@
+This is my solver for Kaggle's Travelling Santa competition:
+
+http://www.kaggle.com/c/traveling-santa-problem
+
+The problem is a modified Euclidean TSP, requiring the competitiors to find
+two edge-disjoint paths (not tours), minimizing the maximum of path lengths.
+
+The solver is not particularly good, ranking 170 out of 356 competitors on
+the final leaderboard. It uses NN with blacklisting for initial feasible
+solutions, then attempts several strategies for optimizing the paths:
+
+1. Optimizing the last edge while preserving feasibility. This is a very fast
+stage, but it doesn't usually improve the objective function by much - even
+though it would be substantially better for a single path.
+
+2. Removal of crossing edges while preserving feasibility. This is also a
+fast stage, and this is where the bulk of the optimization comes from.
+
+3. Stochastic 2-opt. Slow and inefficient. In hindsight, exhaustive
+exploration of the neighbourhood might have yielded much significantly better
+solution, despite being computationally expensive.
+
+Perhaps the only features of interest here are the data structures used, as
+the sources come with a reasonably flexible k-d tree implementation, fast,
+custom, iterator-preserving (but not very save) deque, and a fixed-height
+quad tree for fast edge intersection lookups.
