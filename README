@@ -22,5 +22,5 @@ solution, despite being computationally expensive.
 
 Perhaps the only features of interest here are the data structures used, as
 the sources come with a reasonably flexible k-d tree implementation, fast,
-custom, iterator-preserving (but not very save) deque, and a fixed-height
+custom, iterator-preserving (but not very safe) deque, and a fixed-height
 quad tree for fast edge intersection lookups.
